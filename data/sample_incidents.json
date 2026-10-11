@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from typing import Dict, List
+
+
+class SourceRegistry:
+    """Registry of candidate public sources for offshore risk monitoring."""
+
+    SOURCES = {
+        "news": [
+            "Reuters Energy",
+            "Bloomberg Energy",
+            "Offshore Engineer",
+            "Maritime Executive",
+            "Windpower Monthly",
+            "TradeWinds",
+            "MarineLink",
+        ],
+        "regulatory": [
+            "DNV / ABS / Lloyd's Register bulletin",
+            "Flag state notices",
+            "Port authority communications",
+            "Environmental regulator notices",
+        ],
+        "market": [
+            "Commodity and fuel market reports",
+            "Insurance market review",
+            "Shipping charter market updates",
+        ],
+        "incident": [
+            "IMCA incident database",
+            "MARS reports",
+            "Maritime accident and casualty journals",
+            "Offshore operator public releases",
+        ],
+        "vessel": [
+            "MarineTraffic",
+            "VesselFinder",
+            "AIS and vessel position services",
+        ],
+    }
+
+    @classmethod
+    def get_sources_for_operation(cls, operation_type: str) -> Dict[str, List[str]]:
+        mapping = {
+            "windmill_installation": ["news", "regulatory", "vessel"],
+            "cable_laying": ["news", "incident", "vessel"],
+            "heavy_lift": ["news", "incident", "market"],
+            "fpso_hookup": ["news", "incident", "regulatory"],
+        }
+        selected = mapping.get(operation_type, ["news", "incident", "regulatory"])
+        return {key: cls.SOURCES[key] for key in selected if key in cls.SOURCES}
+
+
+if __name__ == "__main__":
+    print(SourceRegistry.get_sources_for_operation('windmill_installation'))
