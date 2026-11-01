@@ -1,6 +1,6 @@
 # Offshore Risk Intelligence Agent
 
-This repository is a prototype platform for an AI-powered offshore risk intelligence agent focused on global offshore operations such as:
+This repository is a prototype platform for offshore risk intelligence focused on global offshore operations such as:
 
 - wind turbine installation
 - offshore cable laying
@@ -8,54 +8,61 @@ This repository is a prototype platform for an AI-powered offshore risk intellig
 - FPSO hook-up and station keeping
 - subsea installation and marine logistics
 
-The goal is to monitor public industry information, classify risk signals against an offshore taxonomy, estimate financial and schedule impact, link them to project-level risk registers, and present evidence-backed recommendations with source references.
+The product direction is to help project teams review a tender, identify major offshore risks, benchmark against global public incidents, and prioritize corrective actions based on evidence.
 
-## What this prototype does
+## Product concept
 
-- gathers a sample set of offshore risk events from public-source categories
-- classifies them by operation type, geography and risk category
-- stores cost and delay impact for each event
-- links evidence and source references to each risk
-- shows a dashboard for tender/project risk review
-- demonstrates how project risks can be linked to global offshore exposures
+The prototype now includes the following layers:
+
+1. Project / tender risk register
+   - risk title
+   - category and severity
+   - cost and delay impact
+   - recommended actions
+   - project risk summaries
+
+2. Global offshore risk data
+   - public-source style offshore event records
+   - operation, region, and risk category mapping
+   - source links and evidence excerpts
+
+3. Benchmark engine
+   - median and p90 cost and delay comparisons by operation and risk category
+   - common triggers and common mitigation patterns
+
+4. Matching engine
+   - links project risks to relevant global incidents
+   - scores similarity using operation type, region, category and keywords
+   - shows evidence-backed reasons for matches
+
+5. Executive dashboard
+   - project overview cards
+   - risk register detail
+   - benchmark panel
+   - global offshore watch list
+   - evidence and source references
 
 ## Repository structure
 
 ```text
 .
+├── app.py
 ├── dashboard/
 │   └── streamlit_app.py
 ├── data/
+│   ├── project_tenders.json
 │   └── sample_incidents.json
+├── schemas/
+│   └── global_risk.py
 ├── services/
-│   └── source_registry.py
-├── app.py
+│   ├── benchmark_engine.py
+│   ├── global_risk_db.py
+│   ├── risk_linkage.py
+│   └── tender_risk_manager.py
 ├── README.md
 ├── requirements.txt
-├── run_demo.py
-└── schemas/
-    └── global_risk.py
+└── run_demo.py
 ```
-
-## Evidence-linked model
-
-The prototype now includes an explicit evidence layer for each offshore event:
-
-- title
-- operation type
-- region
-- risk category
-- severity
-- cost impact
-- delay impact
-- source name
-- source URL
-- source type
-- evidence excerpt
-- relevant references
-- corrective actions
-
-This enables a project manager or tender team to see not only the risk, but also where it came from and why it matters.
 
 ## Run the dashboard
 
@@ -64,42 +71,22 @@ pip install -r requirements.txt
 streamlit run dashboard/streamlit_app.py
 ```
 
-or run the root app:
+or
 
 ```bash
 streamlit run app.py
 ```
 
-## Run the demo
+## Product view
 
-```bash
-python run_demo.py
-```
+This version is designed for a project manager or tender team to answer the following questions:
 
-## Example public sources included in the prototype
-
-- Offshore Engineer
-- WindEurope
-- TradeWinds
-- IMCA
-- MarineLink
-- Subsea 7
-- TechnipFMC
-- Boskalis
-- Van Oord
-- MODEC
-- Shell
-- Ørsted
-- DNV
-- MarineTraffic
-- VesselFinder
-
-These are used as representative reference sources for a prototype and demonstrate how the system can display source links and evidence panels.
-
-## Product direction
-
-This repository is intended as a global offshore risk intelligence foundation, not a single project-specific ORR. It is designed to support a broader portfolio of risk monitoring across multiple offshore sectors and to provide evidence-backed benchmarking for project teams.
+- What are the major offshore risks relevant to our tender?
+- Which global incidents match our risk profile?
+- What are the typical cost and delay impacts seen across the industry?
+- What actions are usually used to reduce exposure?
+- Which risks require immediate mitigation before commercial sign-off?
 
 ## Notes
 
-This is a prototype and the sample incidents are illustrative. For a production-ready system, the next step would be to add automated feeds, validated source APIs, LLM-based extraction and a proper database layer.
+This is a prototype using sample incident data and sample project profiles. It is designed to validate the product workflow and architecture before live-ingestion and production scale-up.

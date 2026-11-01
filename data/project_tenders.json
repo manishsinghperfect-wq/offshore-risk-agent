@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Dict, List
+
+from services.benchmark_engine import BenchmarkEngine
+from services.risk_linkage import RiskLinkageEngine
+
+
+class TenderRiskManager:
+    """Creates a project risk register and links it to global event benchmarks."""
+
+    def __init__(self, database, linkage_engine: RiskLinkageEngine | None = None, benchmark_engine: BenchmarkEngine | None = None):
+        self.database = database
+        self.linkage_engine = linkage_engine or RiskLinkageEngine(database)
+        self.benchmark_engine = benchmark_engine or BenchmarkEngine(database.get_all_events())
+
+    @staticmethod
+    def _load_json_file(file_path: str | Path) -> List[Dict[str, Any]]:
+        with Path(file_path).open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+    def load_tenders(self, file_path: str | Path) -> List[Dict[str, Any]]:
+        payload = self._load_json_file(file_path)
+        return payload
+
+    def build_tender_summary(self, tender: Dict[str, Any]) -> Dict[str, Any]:
+        risks = tender.get("risks", [])
+        total_cost = sum(float(r.get("likely_cost_usd", 0)) for r in risks)
+        max_delay = max((float(r.get("likely_delay_days", 0)) for r in risks), default=0)
+        high_risk_count = sum(1 for r in risks if r.get("severity") in {"High", "Critical"})
+
+        for risk in risks:
+            risk_matches = self.linkage_engine.match_project_risk(risk)
+            risk["related_events"] = [
+                {
+                    "event_id": match.event_id,
+                    "score": match.match_score,
+                    "title": match.event["title"],
+                    "region": match.event["region"],
+                    "source": match.event["source_name"],
+                    "source_url": match.event["source_url"],
+                    "evidence_excerpt": match.event["evidence_excerpt"],
+                    "benchmark": match.event["benchmark"],
+                    "reasons": match.reasons,
+                }
+                for match in risk_matches[:3]
+            ]
+
+            benchmark = self.benchmark_engine.benchmark_for_risk(risk["operation_type"], risk["risk_category"])
+            if benchmark:
+                risk["benchmark"] = {
+                    "median_cost_usd": benchmark.median_cost_usd,
+                    "p90_cost_usd": benchmark.p90_cost_usd,
+                    "median_delay_days": benchmark.median_delay_days,
+                    "p90_delay_days": benchmark.p90_delay_days,
+                    "benchmark_text": benchmark.benchmark_text,
+                    "common_triggers": benchmark.common_triggers,
+                    "common_actions": benchmark.common_actions,
+                }
+            else:
+                risk["benchmark"] = None
+
+        return {
+            "project_name": tender.get("project_name"),
+            "project_id": tender.get("project_id"),
+            "project_value_usd": tender.get("project_value_usd", 0),
+            "region": tender.get("region"),
+            "operation_type": tender.get("operation_type"),
+            "summary": {
+                "total_risk_cost_usd": total_cost,
+                "max_delay_days": max_delay,
+                "high_risk_count": high_risk_count,
+                "risk_count": len(risks),
+            },
+            "risks": risks,
+        }
