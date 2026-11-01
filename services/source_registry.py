@@ -1,76 +1,65 @@
-from __future__ import annotations
+import json
+from pathlib import Path
 
-from typing import Dict, Any
+import streamlit as st
 
-
-def estimate_cost_and_delay(operation_type: str, risk_category: str, text: str, region: str) -> Dict[str, Any]:
-    text_lower = text.lower()
-
-    base_cost = {
-        "windmill_installation": 1_200_000,
-        "cable_laying": 900_000,
-        "heavy_lift": 1_800_000,
-        "fpso_hookup": 2_500_000,
-    }.get(operation_type, 1_000_000)
-
-    if "2.3m" in text_lower or "2.4m" in text_lower or "2.5m" in text_lower or "estimated cost" in text_lower:
-        for token in ["2.3m", "2.4m", "2.5m", "2.3 m", "2.4 m", "2.5 m"]:
-            if token in text_lower:
-                base_cost = float(token.replace('m', '').replace(' ', '').replace('$', '').replace('usd', '')) * 1_000_000
-                break
-
-    if "3-day" in text_lower or "3 day" in text_lower or "three-day" in text_lower:
-        delay = 3.0
-    elif "5-day" in text_lower or "5 day" in text_lower:
-        delay = 5.0
-    elif "1-day" in text_lower or "1 day" in text_lower:
-        delay = 1.0
-    else:
-        delay = 2.0
-
-    if "dp failure" in text_lower or "blackout" in text_lower:
-        base_cost *= 1.5
-        delay *= 1.5
-    if "weather" in text_lower or "sea state" in text_lower:
-        base_cost *= 1.25
-        delay *= 1.5
-    if "injury" in text_lower or "safety" in text_lower:
-        base_cost *= 1.7
-        delay *= 1.3
-
-    if risk_category == "Commercial":
-        base_cost *= 1.2
-    elif risk_category == "HSE":
-        base_cost *= 1.6
-    elif risk_category == "Weather/Environment":
-        delay *= 1.8
-
-    # Severity assignment
-    severity = "Medium"
-    if base_cost > 3_000_000 or delay > 7:
-        severity = "High"
-    elif base_cost > 1_200_000 or delay > 3:
-        severity = "Medium"
-    else:
-        severity = "Low"
-
-    # Likelihood assignment
-    likelihood = "Moderate"
-    if "failure" in text_lower or "breakdown" in text_lower or "incident" in text_lower:
-        likelihood = "Moderate"
-    elif "weather" in text_lower:
-        likelihood = "High"
-    elif "delay" in text_lower and "weather" not in text_lower:
-        likelihood = "Moderate"
-
-    return {
-        "cost_usd": round(base_cost, 2),
-        "delay_days": round(delay, 2),
-        "severity": severity,
-        "likelihood": likelihood,
-        "confidence": 0.74 if "estimated" in text_lower or "delay" in text_lower else 0.62,
-    }
+DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "sample_incidents.json"
 
 
-if __name__ == "__main__":
-    print(estimate_cost_and_delay('windmill_installation', 'Technical', 'Installation vessel had DP failure during heavy weather while lifting nacelle, causing a three-day delay and repair cost around 2.3M USD.', 'North Sea'))
+def load_incidents():
+    with DATA_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+st.set_page_config(page_title="Offshore Risk Intelligence", page_icon="🌊", layout="wide")
+st.title("🌊 Offshore Risk Intelligence Dashboard")
+st.caption("Evidence-linked offshore risk intelligence prototype for wind, cable, heavy lift and FPSO operations.")
+
+incidents = load_incidents()
+operation_filter = st.selectbox("Operation type", ["All", *sorted({i["operation_type"] for i in incidents})])
+region_filter = st.selectbox("Region", ["All", *sorted({i["region"] for i in incidents})])
+
+filtered = incidents
+if operation_filter != "All":
+    filtered = [item for item in filtered if item["operation_type"] == operation_filter]
+if region_filter != "All":
+    filtered = [item for item in filtered if item["region"] == region_filter]
+
+if not filtered:
+    st.warning("No incidents match the current filters.")
+    st.stop()
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Incidents", len(filtered))
+col2.metric("Average cost", f"${sum(item['financial_impact_usd'] for item in filtered) / len(filtered):,.0f}")
+col3.metric("Average delay", f"{sum(item['delay_days'] for item in filtered) / len(filtered):.1f} days")
+col4.metric("Critical/high", sum(1 for item in filtered if item["severity"] in {"High", "Critical"}))
+
+st.subheader("Evidence-linked risk details")
+for item in filtered:
+    with st.expander(f"{item['title']} — {item['region']} ({item['severity']})"):
+        st.markdown(f"**Operation:** `{item['operation_type']}`")
+        st.markdown(f"**Risk category:** `{item['risk_category']}`")
+        st.markdown(f"**Financial impact:** ${item['financial_impact_usd']:,} USD")
+        st.markdown(f"**Delay impact:** {item['delay_days']} days")
+        st.markdown(f"**Likelihood:** {item['likelihood']}")
+        st.markdown(f"**Benchmark:** {item['benchmark']}")
+        st.write(item["incident_summary"])
+        st.write("**Evidence excerpt:**")
+        st.write(item["evidence_excerpt"])
+        st.markdown(
+            f"**Reference:** [{item['source_name']}]({item['source_url']}) | "
+            f"Date: {item['source_date']} | Confidence: {item['confidence']:.0%}"
+        )
+        if item.get("reference_links"):
+            st.write("**Related references:**")
+            for ref in item["reference_links"]:
+                st.markdown(f"- [{ref['label']}]({ref['url']})")
+        st.write("**Recommended corrective actions:**")
+        for action in item["recommended_actions"]:
+            st.write(f"- {action}")
+
+st.subheader("Source coverage")
+for source_type in sorted({i["source_type"] for i in filtered}):
+    names = ", ".join(sorted({i["source_name"] for i in filtered if i["source_type"] == source_type}))
+    st.write(f"- **{source_type}:** {names}")
